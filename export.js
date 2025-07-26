@@ -1,4 +1,4 @@
-// Lưu ảnh
+
 function exportImage() {
   html2canvas(document.getElementById("output")).then(canvas => {
     const link = document.createElement("a");
@@ -8,12 +8,11 @@ function exportImage() {
   });
 }
 
-// Ghi video ASCII
 let recorder, recordedChunks;
 
 function startRecording() {
   const output = document.getElementById("output");
-  const stream = output.captureStream(25); // FPS
+  const stream = output.captureStream(25);
   recordedChunks = [];
 
   recorder = new MediaRecorder(stream, { mimeType: "video/webm; codecs=vp9" });
