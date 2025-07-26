@@ -1,4 +1,3 @@
-
 function exportImage() {
   html2canvas(document.getElementById("output")).then(canvas => {
     const link = document.createElement("a");
