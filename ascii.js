@@ -1,106 +1,82 @@
 const fileInput = document.getElementById("fileInput");
-const convertBtn = document.getElementById("convertBtn");
-const outputDiv = document.getElementById("output");
+const output = document.getElementById("output");
+const canvas = document.createElement("canvas");
+const ctx = canvas.getContext("2d");
 
-const density = " .:-=+*#%@"; // Mật độ pixel đơn giản
+const asciiChars = "@#W$9876543210?!abc;:+=-,._ ";
 
-function getCharForBrightness(brightness) {
-  const index = Math.floor((brightness / 255) * (density.length - 1));
-  return density[index];
+function rgbToAscii(r, g, b) {
+  const avg = (r + g + b) / 3;
+  const index = Math.floor((avg / 255) * (asciiChars.length - 1));
+  const char = asciiChars[index];
+  return `<span style="color:rgb(${r},${g},${b})">${char}</span>`;
 }
 
-function rgbToAnsi(r, g, b) {
-  return `\x1b[38;2;${r};${g};${b}m`;
-}
+function imageToAscii(img) {
+  const width = 100;
+  const scale = img.height / img.width;
+  const height = Math.round(width * scale);
+  canvas.width = width;
+  canvas.height = height;
 
-function drawAsciiFromImage(image) {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-
-  const maxWidth = 120;
-  const scale = maxWidth / image.width;
-  canvas.width = maxWidth;
-  canvas.height = image.height * scale;
-
-  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-
+  ctx.drawImage(img, 0, 0, width, height);
+  const imgData = ctx.getImageData(0, 0, width, height).data;
   let ascii = "";
-  for (let y = 0; y < canvas.height; y++) {
-    for (let x = 0; x < canvas.width; x++) {
-      const index = (y * canvas.width + x) * 4;
-      const r = imageData[index];
-      const g = imageData[index + 1];
-      const b = imageData[index + 2];
-      const brightness = (r + g + b) / 3;
-      const char = getCharForBrightness(brightness);
-      ascii += `<span style="color: rgb(${r},${g},${b})">${char}</span>`;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const index = (y * width + x) * 4;
+      const r = imgData[index];
+      const g = imgData[index + 1];
+      const b = imgData[index + 2];
+      ascii += rgbToAscii(r, g, b);
     }
-    ascii += "\n";
+    ascii += "<br>";
   }
 
-  outputDiv.innerHTML = ascii;
+  output.innerHTML = ascii;
 }
 
-function handleFile(file) {
+function videoToAscii(video) {
+  const width = 100;
+  const scale = video.videoHeight / video.videoWidth;
+  const height = Math.round(width * scale);
+  canvas.width = width;
+  canvas.height = height;
+
+  function renderFrame() {
+    ctx.drawImage(video, 0, 0, width, height);
+    const frame = ctx.getImageData(0, 0, width, height).data;
+    let ascii = "";
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        ascii += rgbToAscii(frame[i], frame[i+1], frame[i+2]);
+      }
+      ascii += "<br>";
+    }
+
+    output.innerHTML = ascii;
+    requestAnimationFrame(renderFrame);
+  }
+
+  video.play();
+  renderFrame();
+}
+
+fileInput.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
   if (file.type.startsWith("image/")) {
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      const img = new Image();
-      img.onload = function () {
-        drawAsciiFromImage(img);
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+    const img = new Image();
+    img.onload = () => imageToAscii(img);
+    img.src = URL.createObjectURL(file);
   } else if (file.type.startsWith("video/")) {
     const video = document.createElement("video");
-    video.src = URL.createObjectURL(file);
     video.muted = true;
-    video.autoplay = true;
-    video.play();
-
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-
-    video.addEventListener("play", function () {
-      const maxWidth = 120;
-      const scale = maxWidth / video.videoWidth;
-      canvas.width = maxWidth;
-      canvas.height = video.videoHeight * scale;
-
-      function render() {
-        if (!video.paused && !video.ended) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-
-          let ascii = "";
-          for (let y = 0; y < canvas.height; y++) {
-            for (let x = 0; x < canvas.width; x++) {
-              const index = (y * canvas.width + x) * 4;
-              const r = data[index];
-              const g = data[index + 1];
-              const b = data[index + 2];
-              const brightness = (r + g + b) / 3;
-              const char = getCharForBrightness(brightness);
-              ascii += `<span style="color: rgb(${r},${g},${b})">${char}</span>`;
-            }
-            ascii += "\n";
-          }
-
-          outputDiv.innerHTML = ascii;
-          requestAnimationFrame(render);
-        }
-      }
-
-      render();
-    });
-  }
-}
-
-convertBtn.addEventListener("click", () => {
-  const file = fileInput.files[0];
-  if (file) {
-    handleFile(file);
+    video.src = URL.createObjectURL(file);
+    video.addEventListener("loadeddata", () => videoToAscii(video));
   }
 });
